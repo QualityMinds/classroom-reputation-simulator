@@ -6,18 +6,14 @@ class Quality(Enum):
     GOOD = 1
 
 
-class Artefact:
-    def __init__(self, artefactOriginator: int, quality : Quality):
-        self.originator = artefactOriginator
+class Artifact:
+    def __init__(self, creator: int, quality: Quality):
+        self.creator = creator
         self.quality = quality
         self.voters = list()
 
-    def vote(self, voteOriginator : int):
-        self.voters.append(voteOriginator)
+    def vote(self, voter: int):
+        self.voters.append(voter)
 
-    def hasVoted(self, voteOriginator : int):
-        if voteOriginator in self.voters:
-            return True
-        else:
-            return False
-
+    def has_voted(self, voter: int):
+        return voter in self.voters

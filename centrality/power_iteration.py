@@ -1,16 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Feb  7 08:42:32 2018
-
-@author: apo
-"""
-
 import numpy as np
 import numpy.linalg as la
 
 
-def power_iteration(matrix, p0, norm = lambda x: la.norm(x, np.inf), epsilon=0.0001, max_iterations=200):
+def power_iteration(matrix, p0, norm=lambda x: la.norm(x, np.inf), epsilon=0.0001, max_iterations=200):
     """
     power method for eigenvector computation
     parameters:

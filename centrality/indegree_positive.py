@@ -1,16 +1,21 @@
 import numpy
 import numpy.linalg as la
-from reputation.algorithm import Algorithm
+
+from centrality.algorithm import Algorithm
+# TODO: needed?
+from simulation.votematrix import VoteMatrix
 
 
-class InDegree(Algorithm):
-    def __init__(self, norm = lambda x: la.norm(x, 1)):
+class InDegreePositive(Algorithm):
+    def __init__(self, norm=lambda x: la.norm(x, 1)):
         super(Algorithm, self).__init__()
-        self.name = "InDegree"
+        self.name = "InDegreePositive"
         self.norm = norm
 
-    def get_raw_reputation(self, reputationData):
-        votes = numpy.subtract(reputationData.positiveVotes, reputationData.negativeVotes).T
+    def apply(self, votes: VoteMatrix):
+        votes = votes.positive
+        votes = votes.transpose()
+
         x, y = votes.shape
         aggregation = numpy.zeros(x)
 

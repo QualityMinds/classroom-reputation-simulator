@@ -1,125 +1,73 @@
-from enum import Enum
-from simulation.reputation_data import ReputationData
-from simulation.artifact import Artefact, Quality
+from abc import ABC, abstractmethod
+from simulation.action_profile import ActionProfile
+from simulation.votematrix import VoteMatrix
 import random
 import numpy as np
-import secrets
 
 
-class VoteConstraints(Enum):
-    NONE = 0
-    GOODART = 1
-    BADART = 2
-    FRIEND = 3
-
-
-class Community:
+class Community(ABC):
     def __init__(self):
-        self.artefacts = list()
-        self.students = list()
+        self.action_profile: ActionProfile = self.setup_action_profile()
+        self.members = list()
+        self.votes: VoteMatrix = None
 
-    def update_progress(self, progress):
+    @abstractmethod
+    def setup_action_profile(self):
+        return None
+
+    @abstractmethod
+    def reset_run(self):
+        pass
+
+    @staticmethod
+    def update_progress(progress):
         print("\rProgress: [{0:50s}] {1:.1f}%".format('#' * int(progress * 50), progress * 100), end="", flush=True)
 
-
-    def run(self, reputationAlgorithms, steps, samples):
-        allResults = list()
-        scoreVector = []
-        intermediateResultList = []
-        for algIdx in range(len(reputationAlgorithms)):
-            scoreVector.insert(algIdx, np.zeros((1, len(self.students))))
-            intermediateResultList.insert(algIdx, list())
-
-        for sample in range(samples):
-            self.artefacts = list()
-            self.votings = ReputationData(len(self.students))
-            for step in range(steps):
-                self.step()
-                for alg in reputationAlgorithms:
-                    alg.receiveIntermediateReputationData(step, self.votings)
-
-            self.update_progress((sample + 1) / samples)
-
-            for algIdx, alg in enumerate(reputationAlgorithms):
-                intermediateResult = alg.get_raw_reputation(self.votings)
-
-                preparedIntermediateResult = list()
-                for student in self.students:
-                    preparedIntermediateResult.append((intermediateResult[student.studentId], student.label, student.studentId))
-                    preparedIntermediateResult = sorted(preparedIntermediateResult, key=lambda x: x[0])
-                intermediateResultList[algIdx].append(preparedIntermediateResult)
-                scoreVector[algIdx] = scoreVector[algIdx] + intermediateResult
-
-        for algIdx, alg in enumerate(reputationAlgorithms):
-            scoreVector[algIdx] /= samples
-            scoreVector[algIdx] = scoreVector[algIdx].flat
-            results = list()
-            for student in self.students:
-                results.append((scoreVector[algIdx][student.studentId], student.label, student.studentId))
-                results = sorted(results, key=lambda x: x[0])
-            allResults.append((alg.name, results, intermediateResultList[algIdx]))
-        return allResults
-
-
     def step(self):
-        random.shuffle(self.students)
-        for st in self.students:
+        random.shuffle(self.members)
+        for st in self.members:
             st.step()
 
-    def addStudents(self, prototype, count):
+    def create_members_by_prototype(self, prototype, count):
         for i in range(0, count):
-            student = prototype.copy()
-            student.setup(len(self.students), self)
-            self.students.append(student)
+            member = prototype.copy(len(self.members), self)
+            self.members.append(member)
 
-    def addArtefact(self, artefact):
-        self.artefacts.append(artefact)
+    def simulate(self, algorithms, num_steps, num_runs):
+        all_results = list()
+        score_vector = []
 
-    def addVote(self, voter:int, artefact:Artefact, quality:Quality):
-        if quality == quality.BAD:
-            self.votings.negativeVotes[voter, artefact.originator] += 1
-        else:
-            self.votings.positiveVotes[voter, artefact.originator] += 1
+        intermediate_results = []
+        for alg_idx in range(len(algorithms)):
+            score_vector.insert(alg_idx, np.zeros((1, len(self.members))))
+            intermediate_results.insert(alg_idx, list())
 
-    def getOtherArtefacts(self, myId):
-        candidates = [artf for artf in self.artefacts if not artf.originator == myId and not artf.hasVoted(myId)]
-        return candidates
+        for run in range(num_runs):
+            self.reset_run()
+            for step in range(num_steps):
+                self.step()
+                for alg in algorithms:
+                    # for stateful algorithms: feedback intermediate result
+                    alg.notify_intermediary_result(step, self.votes)
 
-    def getOtherArtefactsOfQuality(self, myId, quality):
-        candidates = [artf for artf in self.getOtherArtefacts(myId) if artf.quality == quality]
-        return candidates
+            for alg_idx, alg in enumerate(algorithms):
+                intermediate_result = alg.apply(self.votes)
+                prepared_intermediate_result = sorted(
+                    [(intermediate_result[m.member_id], m.label, m.member_id) for m in self.members],
+                    key=lambda x: x[0])
+                intermediate_results[alg_idx].append(prepared_intermediate_result)
+                score_vector[alg_idx] = score_vector[alg_idx] + intermediate_result
 
-    def getOtherArtefactsMatchingMemberIds(self, myId, otherIds):
-        candidates = self.getOtherArtefacts(myId)
-        return [artf for artf in candidates if (artf.originator in otherIds)]
+            self.update_progress((run + 1) / num_runs)
 
-    def createPostAction(self, quality:Quality):
-        return lambda x: self.addArtefact(Artefact(x.studentId, quality))
+        for alg_idx, alg in enumerate(algorithms):
+            score_vector[alg_idx] /= num_runs
+            score_vector[alg_idx] = score_vector[alg_idx].flat
+            results = list()
+            for member in self.members:
+                results.append((score_vector[alg_idx][member.member_id], member.label, member.member_id))
+                results = sorted(results, key=lambda x: x[0])
+            all_results.append((alg.name, results, intermediate_results[alg_idx]))
 
-    def createVoteAction(self, quality:Quality, constraint:VoteConstraints):
-        voteActions = {
-            VoteConstraints.NONE : self.voteAny,
-            VoteConstraints.GOODART : self.voteGoodArtefact,
-            VoteConstraints.BADART : self.voteBadArtefact,
-            VoteConstraints.FRIEND : self.voteFriend
-        }
-        return lambda x: voteActions.get(constraint)(x, quality)
+        return all_results
 
-    def createIdleAction(self):
-        return lambda x: None
-
-    def vote(self, id, quality, artefacts):
-        if(len(artefacts) > 0):
-            self.addVote(id, secrets.choice(artefacts), quality)
-
-    def voteAny(self, student, quality):
-        self.vote(student.studentId, quality, self.getOtherArtefacts(student.studentId))
-
-    def voteGoodArtefact(self, student, quality):
-        self.vote(student.studentId, quality, self.getOtherArtefactsOfQuality(student.studentId, Quality.GOOD))
-
-    def voteBadArtefact(self, student, quality):
-        self.vote(student.studentId, quality, self.getOtherArtefactsOfQuality(student.studentId, Quality.BAD))
-
-    def voteFriend(self, student, quality):
-        self.vote(student.studentId, quality, self.getOtherArtefactsMatchingMemberIds(student.studentId, student.friends))

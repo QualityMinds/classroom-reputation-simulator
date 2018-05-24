@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-from reputation import power_iteration as pow
+from centrality import power_iteration as pow
 
 
-class Test_PowerMethod(unittest.TestCase):
-    def test_PowerMethod(self):
+class TestPowerMethod(unittest.TestCase):
+    def test_powermethod(self):
         m = np.matrix([
             [ 1/60,  7/15, 7/15,  1/60,  1/60, 1/60],
             [ 1/6 ,  1/6 , 1/6 ,  1/6 ,  1/6 , 1/6 ],
@@ -19,6 +19,7 @@ class Test_PowerMethod(unittest.TestCase):
     
         check = np.all(np.around(p - solution, decimals=3) == 0)
         assert check
+
 
 if __name__ == '__main__':
     unittest.main()

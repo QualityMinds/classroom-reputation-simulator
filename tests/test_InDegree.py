@@ -2,39 +2,39 @@ import unittest
 import sys
 import numpy
 sys.path.append('../')
-from reputation.indegree import InDegree
-from simulation.reputation_data import ReputationData
+from centrality.indegree import InDegree
+from simulation.votematrix import VoteMatrix
 
 
-class Test_test_InDegree(unittest.TestCase):
-    def test_InDegreeTrivial(self):      
-        repData = ReputationData(4)
+class TestInDegree(unittest.TestCase):
+    def test_indegree_trivial(self):
+        votes = VoteMatrix(4)
 
-        repData.positiveVotes[0, 1] = 1
-        repData.positiveVotes[1, 2] = 1
-        repData.positiveVotes[2, 3] = 1
-        repData.positiveVotes[3, 0] = 1
+        votes.positive[0, 1] = 1
+        votes.positive[1, 2] = 1
+        votes.positive[2, 3] = 1
+        votes.positive[3, 0] = 1
 
-        inDegree = InDegree()
+        in_degree = InDegree()
 
-        m = inDegree.get_raw_reputation(repData)
+        m = in_degree.apply(votes)
 
         assert len(m) == 4
         for score in m:
             assert score == 0.25
 
-    def test_InDegree(self):      
-        repData = ReputationData(4)
+    def test_indegree(self):
+        votes = VoteMatrix(4)
 
-        repData.positiveVotes[0, 1] = 1
-        repData.positiveVotes[0, 2] = 1
-        repData.positiveVotes[2, 1] = 1
-        repData.positiveVotes[3, 0] = 1
-        repData.positiveVotes[3, 2] = 4
+        votes.positive[0, 1] = 1
+        votes.positive[0, 2] = 1
+        votes.positive[2, 1] = 1
+        votes.positive[3, 0] = 1
+        votes.positive[3, 2] = 4
 
-        inDegree = InDegree()
+        in_degree = InDegree()
 
-        m = inDegree.get_raw_reputation(repData)
+        m = in_degree.apply(votes)
 
         assert numpy.abs(m[0] - 0.125) < 0.001
         assert numpy.abs(m[1] - 0.250) < 0.001
